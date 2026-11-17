@@ -1,0 +1,50 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// Boards have no owner: anyone with the link can join, like a shared document.
+model Board {
+  id        String   @id
+  name      String
+  createdAt DateTime @default(now())
+
+  columns Column[]
+  cards   Card[]
+}
+
+model Column {
+  id       String @id @default(cuid())
+  boardId  String
+  title    String
+  /// Fractional index key, see packages/shared/src/ordering.ts
+  position String
+
+  board Board  @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  cards Card[]
+
+  @@index([boardId])
+}
+
+model Card {
+  id          String   @id @default(cuid())
+  boardId     String
+  columnId    String
+  title       String
+  description String   @default("")
+  color       String   @default("gray")
+  position    String
+  updatedAt   DateTime @updatedAt
+  /// Display name of the last person who changed the card
+  updatedBy   String?
+
+  board  Board  @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  column Column @relation(fields: [columnId], references: [id], onDelete: Cascade)
+
+  @@index([columnId, position])
+  @@index([boardId])
+}
