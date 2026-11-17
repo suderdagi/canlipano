@@ -1,0 +1,13 @@
+{
+  "name": "canlipano",
+  "private": true,
+  "description": "Real-time collaborative kanban board: React, Socket.IO, Express, Prisma, PostgreSQL",
+  "workspaces": ["packages/*", "apps/*"],
+  "scripts": {
+    "dev": "npm run dev --workspace=@canlipano/server & npm run dev --workspace=@canlipano/web",
+    "build": "npm run build --workspace=@canlipano/web && npm run build --workspace=@canlipano/server",
+    "start": "npm run start --workspace=@canlipano/server",
+    "test": "npm test --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present"
+  }
+}
