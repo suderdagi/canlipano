@@ -1,0 +1,16 @@
+# One-click deploy on Render: the app runs as a Docker web service with a free PostgreSQL database
+services:
+  - type: web
+    name: canlipano
+    runtime: docker
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: canlipano-db
+          property: connectionString
+
+databases:
+  - name: canlipano-db
+    plan: free
