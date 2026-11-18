@@ -8,7 +8,7 @@ A real-time task board. Create a board, share the link, and everyone on it sees 
 
 - **Live collaboration** over WebSockets: cards, columns and edits sync to everyone instantly
 - **Presence:** see who is on the board right now
-- **Drag and drop** between and within columns, with mouse, keyboard or touch (press and hold a card)
+- **Drag and drop** between and within columns, with mouse, keyboard or touch (press and hold a card; checked in Chrome's touch emulation, not on a physical phone yet)
 - **Optimistic UI:** your changes appear immediately and are rolled back if the server rejects them
 - **Reconnects** automatically and reloads the board, so nothing is missed after a network drop
 - Card descriptions and colour labels, renameable columns, recent boards

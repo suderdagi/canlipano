@@ -8,7 +8,7 @@ import { toCard, toColumn } from './serialize'
 const DEFAULT_COLUMNS = ['To do', 'In progress', 'Done']
 const ALPHABET = 'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789'
 
-/** Short, unguessable id used in the board's link (~59 bits of randomness). */
+/** Short, unguessable id used in the board's link (10 of 56 characters, ~58 bits of randomness). */
 function boardId(): string {
   return Array.from(randomBytes(10), (byte) => ALPHABET[byte % ALPHABET.length]).join('')
 }
