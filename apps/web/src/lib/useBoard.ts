@@ -10,6 +10,7 @@ import type {
   ServerToClientEvents,
   UpdateCardInput,
 } from '@canlipano/shared'
+import { changedFields, track } from './analytics'
 import { moveLocally, removeCard, upsertCard, upsertColumn, type BoardState } from './boardState'
 
 type AppSocket = Socket<ServerToClientEvents, ClientToServerEvents>
@@ -45,8 +46,18 @@ export function useBoard(boardId: string, me: Participant | null) {
         setStatus('online')
       })
 
-    socket.on('connect', join)
-    socket.on('disconnect', () => setStatus('offline'))
+    let offlineSince: number | null = null
+    socket.on('connect', () => {
+      if (offlineSince !== null) {
+        track('reconnected', { offline_seconds: Math.round((Date.now() - offlineSince) / 1000) })
+        offlineSince = null
+      }
+      join()
+    })
+    socket.on('disconnect', () => {
+      offlineSince = Date.now()
+      setStatus('offline')
+    })
     socket.on('card:upserted', (card) => setState((s) => s && upsertCard(s, card)))
     socket.on('card:deleted', ({ id }) => setState((s) => s && removeCard(s, id)))
     socket.on('column:upserted', (column) => setState((s) => s && upsertColumn(s, column)))
@@ -75,6 +86,7 @@ export function useBoard(boardId: string, me: Participant | null) {
         emit.call(socketRef.current, event, payload, (res) => {
           if (res.ok) return resolve(res.data)
           if (previous) setState(previous)
+          track('action_rejected', { action: String(event) })
           setError(res.error)
           resolve(null)
         })
@@ -85,14 +97,18 @@ export function useBoard(boardId: string, me: Participant | null) {
   const actions = {
     createCard: async (columnId: string, title: string) => {
       const card = await send<Card>('card:create', { columnId, title })
-      if (card) setState((s) => s && upsertCard(s, card))
+      if (!card) return
+      track('card_created')
+      setState((s) => s && upsertCard(s, card))
     },
     updateCard: async (input: UpdateCardInput) => {
       const card = await send<Card>('card:update', input, (s) => {
         const existing = s.cards.find((c) => c.id === input.id)
         return existing ? upsertCard(s, { ...existing, ...input }) : s
       })
-      if (card) setState((s) => s && upsertCard(s, card))
+      if (!card) return
+      track('card_edited', { fields: changedFields({ ...input }) })
+      setState((s) => s && upsertCard(s, card))
     },
     moveCard: async (id: string, columnId: string, beforeId: string | null) => {
       const card = await send<Card>('card:move', { id, columnId, beforeId }, (s) =>
@@ -100,10 +116,16 @@ export function useBoard(boardId: string, me: Participant | null) {
       )
       if (card) setState((s) => s && upsertCard(s, card))
     },
-    deleteCard: (id: string) => send('card:delete', { id }, (s) => removeCard(s, id)),
+    deleteCard: async (id: string) => {
+      const res = await send('card:delete', { id }, (s) => removeCard(s, id))
+      if (res !== null) track('card_deleted')
+      return res
+    },
     createColumn: async (title: string) => {
       const column = await send<Column>('column:create', { title })
-      if (column) setState((s) => s && upsertColumn(s, column))
+      if (!column) return
+      track('column_created')
+      setState((s) => s && upsertColumn(s, column))
     },
     renameColumn: (id: string, title: string) =>
       send('column:rename', { id, title }, (s) => {
