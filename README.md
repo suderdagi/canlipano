@@ -8,7 +8,7 @@ A real-time task board. Create a board, share the link, and everyone on it sees 
 
 - **Live collaboration** over WebSockets: cards, columns and edits sync to everyone instantly
 - **Presence:** see who is on the board right now
-- **Drag and drop** between and within columns, with mouse, touch or keyboard
+- **Drag and drop** between and within columns, with mouse, keyboard or touch (press and hold a card)
 - **Optimistic UI:** your changes appear immediately and are rolled back if the server rejects them
 - **Reconnects** automatically and reloads the board, so nothing is missed after a network drop
 - Card descriptions and colour labels, renameable columns, recent boards
@@ -63,6 +63,8 @@ The client only says *where* a card should go ("before card X" or "at the end");
 - Malformed requests and database errors are answered with an error instead of stopping the server (tested)
 - Boards from different links are isolated: card ids from another board are rejected
 - Presence handles the same person in several tabs
+- The card dialog only saves the fields you changed, so it can't overwrite an edit someone else made while it was open
+- While the connection is down, changes are refused with a message instead of being held back and rejected after the reconnect
 - In production one Node process serves the API, WebSockets and the built React app
 
 ## Product analytics
@@ -121,7 +123,7 @@ npm test
 
 - **Shared:** ordering keys, including 300 random drag-and-drop moves
 - **Server:** real Socket.IO clients against a real database: live sync between clients, presence, board isolation, reordering, concurrent moves and columns, validation, malformed requests and database failures
-- **Web:** the optimistic state updates, and that the real PostHog SDK, with the app's settings, never sends a board id
+- **Web:** the optimistic state updates, which card fields an edit changed, and that the real PostHog SDK, with the app's settings, never sends a board id
 
 ## Deploying
 

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { clsx } from 'clsx'
 import { Trash2, X } from 'lucide-react'
 import { CARD_COLORS, type Card, type UpdateCardInput } from '@canlipano/shared'
+import { cardChanges } from '../lib/cardChanges'
 import { COLOR_CLASSES } from './CardItem'
 
 interface Props {
@@ -15,11 +16,14 @@ export function CardDialog({ card, onClose, onSave, onDelete }: Props) {
   const ref = useRef<HTMLDialogElement>(null)
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
+  // What the fields held when the card was opened: only real changes are saved (see cardChanges)
+  const opened = useRef({ title: '', description: '' })
 
   useEffect(() => {
     if (card) {
       setTitle(card.title)
       setDescription(card.description)
+      opened.current = { title: card.title, description: card.description }
       if (!ref.current?.open) ref.current?.showModal()
     } else {
       ref.current?.close()
@@ -31,10 +35,8 @@ export function CardDialog({ card, onClose, onSave, onDelete }: Props) {
   if (!card) return <dialog ref={ref} />
 
   const save = () => {
-    const changes: UpdateCardInput = { id: card.id }
-    if (title.trim() && title.trim() !== card.title) changes.title = title.trim()
-    if (description !== card.description) changes.description = description
-    if (Object.keys(changes).length > 1) onSave(changes)
+    const changes = cardChanges(card.id, opened.current, { title, description })
+    if (changes) onSave(changes)
     onClose()
   }
 

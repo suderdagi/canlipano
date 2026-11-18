@@ -29,18 +29,24 @@ export function useBoard(boardId: string, me: Participant | null) {
   const [status, setStatus] = useState<ConnectionStatus>('connecting')
   const [error, setError] = useState<string | null>(null)
   const socketRef = useRef<AppSocket | null>(null)
+  // True from the moment the board is joined until the connection drops
+  const onlineRef = useRef(false)
 
   useEffect(() => {
     if (!me) return
     const socket: AppSocket = io({ transports: ['websocket'] })
     socketRef.current = socket
+    let retry: ReturnType<typeof setTimeout> | undefined
 
     const join = () =>
       socket.emit('board:join', { boardId, participant: me }, (res: Ack<BoardSnapshot>) => {
         if (!res.ok) {
-          setStatus('not-found')
+          onlineRef.current = false
+          if (res.error === 'Board not found') setStatus('not-found')
+          else retry = setTimeout(join, 2000) // a temporary problem on the server: try again
           return
         }
+        onlineRef.current = true
         const { board, columns, cards, participants } = res.data
         setState({ name: board.name, columns, cards, participants })
         setStatus('online')
@@ -55,6 +61,7 @@ export function useBoard(boardId: string, me: Participant | null) {
       join()
     })
     socket.on('disconnect', () => {
+      onlineRef.current = false
       offlineSince = Date.now()
       setStatus('offline')
     })
@@ -64,6 +71,7 @@ export function useBoard(boardId: string, me: Participant | null) {
     socket.on('presence:update', (participants) => setState((s) => s && { ...s, participants }))
 
     return () => {
+      clearTimeout(retry)
       socket.disconnect()
     }
   }, [boardId, me])
@@ -75,6 +83,13 @@ export function useBoard(boardId: string, me: Participant | null) {
   const send = useCallback(
     <T,>(event: keyof ClientToServerEvents, payload: unknown, optimistic?: (s: BoardState) => BoardState) =>
       new Promise<T | null>((resolve) => {
+        // Events sent while offline would be held back and then refused after the reconnect,
+        // because the new connection has not joined the board yet
+        if (!onlineRef.current) {
+          setError('You are offline. Changes are not saved until the connection is back.')
+          resolve(null)
+          return
+        }
         let previous: BoardState | null = null
         if (optimistic) {
           setState((s) => {
