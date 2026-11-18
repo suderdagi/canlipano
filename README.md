@@ -81,7 +81,7 @@ A board is only useful once someone else joins it, so the main question is: **ho
 
 With these, a PostHog funnel `board_created → board_link_copied → board_became_collaborative` shows where boards stop on their way to being shared, and the reliability events show whether the live experience holds up for real users.
 
-**Privacy.** A board's link is its password, so board ids never leave the app: pageviews are sent as `/b/:boardId`. People are identified by the random id their browser was given, not the name they typed. Card titles and descriptions are never sent; `card_edited` only lists which fields changed. Autocapture and session recording are off.
+**Privacy.** A board's link is its password, so board ids never leave the app. posthog-js adds the page address to every event (`$current_url`, `$pathname`, `$session_entry_url` and more), so each event passes through `scrubEvent`, which replaces the id with `:boardId` in every string. People are identified by the random id their browser was given, not the name they typed. Card titles and descriptions are never sent; `card_edited` only lists which fields changed. Autocapture and session recording are off, and so are PostHog's feature flags, surveys, exception, performance, heatmap and dead-click capture, so a setting on the PostHog side can't turn on more data collection.
 
 **Turning it on.** Analytics does nothing without `VITE_POSTHOG_KEY`. Set it in `apps/web/.env` for local development, or as an environment variable on Render (it's passed to the Docker build). The SDK is imported lazily and isn't bundled at all when no key is set.
 
@@ -121,7 +121,7 @@ npm test
 
 - **Shared:** ordering keys, including 300 random drag-and-drop moves
 - **Server:** real Socket.IO clients against a real database: live sync between clients, presence, board isolation, reordering, concurrent moves and columns, validation, malformed requests and database failures
-- **Web:** the optimistic state updates, and that analytics never sends board ids or card content
+- **Web:** the optimistic state updates, and that the real PostHog SDK, with the app's settings, never sends a board id
 
 ## Deploying
 

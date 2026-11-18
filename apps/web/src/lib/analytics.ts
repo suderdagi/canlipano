@@ -1,3 +1,5 @@
+import type { CaptureResult, PostHogConfig } from 'posthog-js'
+
 /**
  * Product analytics with PostHog.
  *
@@ -76,6 +78,44 @@ export function isFirstCollaboration(boardId: string, participants: number, stor
 }
 
 /**
+ * posthog-js adds the full address of the page to every event ($current_url, $pathname,
+ * $referrer, $session_entry_url ...), and on a board page that address contains the board id,
+ * which is the key to the board. This runs on each event just before it is sent and replaces
+ * the id in every string, so no board id leaves the browser.
+ */
+const BOARD_PATH = /\/b\/[^/?#\s"']+/g
+
+function withoutBoardIds(value: unknown): unknown {
+  if (typeof value === 'string') return value.replace(BOARD_PATH, '/b/:boardId')
+  if (Array.isArray(value)) return value.map(withoutBoardIds)
+  if (value && Object.getPrototypeOf(value) === Object.prototype) {
+    return Object.fromEntries(Object.entries(value).map(([key, inner]) => [key, withoutBoardIds(inner)]))
+  }
+  return value // numbers, booleans, null, dates
+}
+
+export function scrubEvent(event: CaptureResult): CaptureResult {
+  return withoutBoardIds(event) as CaptureResult
+}
+
+/** PostHog settings that don't depend on the environment. Exported so a test can run the real SDK with them. */
+export const posthogOptions: Partial<PostHogConfig> = {
+  capture_pageview: false, // sent on route changes instead, without board ids
+  autocapture: false,
+  disable_session_recording: true, // boards can contain private notes
+  person_profiles: 'identified_only',
+  // The app uses none of PostHog's other features, so they are switched off explicitly:
+  // a project setting on the PostHog side can't turn on extra data collection.
+  advanced_disable_flags: true,
+  disable_surveys: true,
+  capture_exceptions: false,
+  capture_performance: false,
+  capture_heatmaps: false,
+  capture_dead_clicks: false,
+  before_send: scrubEvent,
+}
+
+/**
  * Starts PostHog when VITE_POSTHOG_KEY is set at build time; otherwise analytics is a no-op.
  * The SDK is imported lazily so it isn't part of the initial bundle.
  */
@@ -85,11 +125,8 @@ export async function initAnalytics() {
 
   const { default: posthog } = await import('posthog-js')
   posthog.init(key, {
+    ...posthogOptions,
     api_host: import.meta.env.VITE_POSTHOG_HOST || 'https://eu.i.posthog.com',
-    capture_pageview: false, // sent on route changes instead, without board ids
-    autocapture: false,
-    disable_session_recording: true, // boards can contain private notes
-    person_profiles: 'identified_only',
   })
   setAnalyticsSink({
     capture: (event, properties) => posthog.capture(event, properties),
