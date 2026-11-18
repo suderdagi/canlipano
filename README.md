@@ -8,7 +8,7 @@ A real-time task board. Create a board, share the link, and everyone on it sees 
 
 - **Live collaboration** over WebSockets: cards, columns and edits sync to everyone instantly
 - **Presence:** see who is on the board right now
-- **Drag and drop** between and within columns, with mouse, keyboard or touch (press and hold a card; checked in Chrome's touch emulation, not on a physical phone yet)
+- **Drag and drop** between and within columns, with mouse, keyboard or touch (keyboard: Enter opens a card, Space picks it up, arrow keys move it; touch: press and hold a card, checked in Chrome's touch emulation, not on a physical phone yet)
 - **Optimistic UI:** your changes appear immediately and are rolled back if the server rejects them
 - **Reconnects** automatically and reloads the board, so nothing is missed after a network drop
 - Card descriptions and colour labels, renameable columns, recent boards
@@ -125,7 +125,7 @@ npm test
 
 - **Shared:** ordering keys, including 300 random drag-and-drop moves
 - **Server:** real Socket.IO clients against a real database: live sync between clients, presence, board isolation, reordering, concurrent moves and columns, validation, malformed requests and database failures
-- **Web:** the optimistic state updates, which card fields an edit changed, and that the real PostHog SDK, with the app's settings, never sends a board id
+- **Web:** the optimistic state updates, which card fields an edit changed, how a card reacts to Enter and Space, and that the real PostHog SDK, with the app's settings, never sends a board id
 
 ## Deploying
 

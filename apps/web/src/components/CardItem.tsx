@@ -45,11 +45,14 @@ export function SortableCard({ card, onOpen }: { card: Card; onOpen: () => void 
       style={{ transform: CSS.Transform.toString(transform), transition }}
       className={clsx('cursor-grab list-none active:cursor-grabbing', isDragging && 'opacity-30')}
       onClick={onOpen}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') onOpen()
-      }}
       {...attributes}
       {...listeners}
+      // Placed after the spreads on purpose: dnd-kit's own keydown handler would replace this one.
+      // Enter opens the card, Space picks it up (see the keyboard sensor in BoardPage)
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' && !isDragging) return onOpen()
+        listeners?.onKeyDown?.(e)
+      }}
     >
       <CardView card={card} />
     </li>

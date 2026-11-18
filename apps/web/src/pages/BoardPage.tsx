@@ -20,6 +20,7 @@ import { loadIdentity, saveIdentity } from '../lib/identity'
 import { rememberBoard } from '../lib/recentBoards'
 import { identify, isFirstCollaboration, track } from '../lib/analytics'
 import { cardsIn } from '../lib/boardState'
+import { KEYBOARD_CODES } from '../lib/keyboardCodes'
 import { useBoard, type ConnectionStatus } from '../lib/useBoard'
 import { ColumnView } from '../components/ColumnView'
 import { CardView } from '../components/CardItem'
@@ -45,7 +46,7 @@ function Board({ boardId, me }: { boardId: string; me: Participant }) {
     // On touch screens a drag starts after a short press; moving right away scrolls the board
     // instead (a pointer sensor would hand every touch gesture over to the browser's scrolling)
     useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates, keyboardCodes: KEYBOARD_CODES })
   )
 
   useEffect(() => {
