@@ -105,6 +105,8 @@ apps/web/
 
 ## Running locally
 
+Needs Node.js 22 or newer (the build tooling requires it; Node 20 reached end of life in April 2026) and Docker for the database.
+
 ```bash
 docker compose up -d db             # PostgreSQL
 cp apps/server/.env.example apps/server/.env
