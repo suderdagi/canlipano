@@ -13,6 +13,7 @@ A real-time task board. Create a board, share the link, and everyone on it sees 
 - **Reconnects** automatically and reloads the board, so nothing is missed after a network drop
 - Card descriptions and colour labels, renameable columns, recent boards
 - **No sign up:** a board's link is its key, like a shared document
+- **Product analytics** with PostHog, built around the sharing funnel (off unless a key is configured)
 
 | Home | Editing a card |
 | --- | --- |
@@ -25,6 +26,7 @@ A real-time task board. Create a board, share the link, and everyone on it sees 
 | Client | React 19, TypeScript, Vite, Tailwind CSS, dnd-kit, Socket.IO client |
 | Server | Node.js, Express 5, Socket.IO, Prisma, PostgreSQL |
 | Shared | TypeScript types, Zod schemas and the ordering algorithm used by both sides |
+| Analytics | PostHog (posthog-js, loaded lazily) |
 | Tooling | npm workspaces (monorepo), Vitest, GitHub Actions, Docker, Render blueprint |
 
 ## How it works
@@ -62,6 +64,26 @@ The client only says *where* a card should go ("before card X" or "at the end");
 - Presence handles the same person in several tabs
 - In production one Node process serves the API, WebSockets and the built React app
 
+## Product analytics
+
+A board is only useful once someone else joins it, so the main question is: **how many new boards become shared boards?** The events in [`apps/web/src/lib/analytics.ts`](apps/web/src/lib/analytics.ts) are built around that funnel:
+
+| Event | Properties | Why |
+| --- | --- | --- |
+| `board_created` | `custom_name` | Top of the funnel |
+| `board_link_copied` | | Does the creator try to share? |
+| `board_became_collaborative` | `participants` | Activation: the first time a second person is on the board (sent once per board) |
+| `board_opened` | `participants` | Are people coming back to boards? |
+| `card_created`, `card_moved`, `card_edited`, `card_deleted`, `column_created` | `across_columns`, `fields` | Which features are used once a board is active |
+| `action_rejected` | `action` | Where optimistic updates get rolled back |
+| `reconnected` | `offline_seconds` | How often and how long the real-time connection drops |
+
+With these, a PostHog funnel `board_created → board_link_copied → board_became_collaborative` shows where boards stop on their way to being shared, and the reliability events show whether the live experience holds up for real users.
+
+**Privacy.** A board's link is its password, so board ids never leave the app: pageviews are sent as `/b/:boardId`. People are identified by the random id their browser was given, not the name they typed. Card titles and descriptions are never sent; `card_edited` only lists which fields changed. Autocapture and session recording are off.
+
+**Turning it on.** Analytics does nothing without `VITE_POSTHOG_KEY`. Set it in `apps/web/.env` for local development, or as an environment variable on Render (it's passed to the Docker build). The SDK is imported lazily and isn't bundled at all when no key is set.
+
 ## Project structure
 
 ```
@@ -73,6 +95,7 @@ apps/server/
   tests/               # integration tests with real sockets and PostgreSQL
 apps/web/
   src/lib/useBoard.ts  # connection, optimistic updates, reconnect
+  src/lib/analytics.ts # typed PostHog events
   src/pages/           # home and board pages
   src/components/      # columns, cards, card dialog
 ```
@@ -97,7 +120,7 @@ npm test
 
 - **Shared:** ordering keys, including 300 random drag-and-drop moves
 - **Server:** real Socket.IO clients against a real database: live sync between clients, presence, board isolation, reordering, concurrent moves, validation
-- **Web:** the optimistic state updates
+- **Web:** the optimistic state updates, and that analytics never sends board ids or card content
 
 ## Deploying
 

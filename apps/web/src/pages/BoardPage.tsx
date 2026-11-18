@@ -17,6 +17,7 @@ import { Check, Link2, Plus } from 'lucide-react'
 import type { Card, Participant } from '@canlipano/shared'
 import { loadIdentity, saveIdentity } from '../lib/identity'
 import { rememberBoard } from '../lib/recentBoards'
+import { identify, isFirstCollaboration, track } from '../lib/analytics'
 import { cardsIn } from '../lib/boardState'
 import { useBoard, type ConnectionStatus } from '../lib/useBoard'
 import { ColumnView } from '../components/ColumnView'
@@ -49,6 +50,21 @@ function Board({ boardId, me }: { boardId: string; me: Participant }) {
       document.title = `${state.name} · CanlıPano`
     }
   }, [boardId, state?.name]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => identify(me.id), [me.id])
+
+  // Sent once per visit, when the board has loaded
+  const loaded = state !== null
+  useEffect(() => {
+    if (loaded) track('board_opened', { participants: state.participants.length })
+  }, [loaded]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const participantCount = state?.participants.length ?? 0
+  useEffect(() => {
+    if (isFirstCollaboration(boardId, participantCount, localStorage)) {
+      track('board_became_collaborative', { participants: participantCount })
+    }
+  }, [boardId, participantCount])
 
   useEffect(() => {
     if (!error) return
@@ -111,11 +127,13 @@ function Board({ boardId, me }: { boardId: string; me: Participant }) {
       }
     }
 
+    track('card_moved', { across_columns: card.columnId !== columnId })
     actions.moveCard(card.id, columnId, beforeId)
   }
 
   const copyLink = async () => {
     await navigator.clipboard?.writeText(window.location.href)
+    track('board_link_copied')
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }

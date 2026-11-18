@@ -10,6 +10,9 @@ services:
         fromDatabase:
           name: canlipano-db
           property: connectionString
+      # Optional: set in the Render dashboard to turn on product analytics
+      - key: VITE_POSTHOG_KEY
+        sync: false
 
 databases:
   - name: canlipano-db

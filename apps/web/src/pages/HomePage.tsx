@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { ArrowRight, Users, Zap, MousePointerClick } from 'lucide-react'
 import { recentBoards } from '../lib/recentBoards'
+import { track } from '../lib/analytics'
 
 const FEATURES = [
   { icon: Zap, title: 'Instant', text: 'Changes show up for everyone the moment they happen.' },
@@ -28,6 +29,7 @@ export function HomePage() {
       })
       if (!res.ok) throw new Error()
       const board = await res.json()
+      track('board_created', { custom_name: name.trim() !== '' })
       navigate(`/b/${board.id}`)
     } catch {
       setError('Could not create the board. Is the server running?')

@@ -7,6 +7,9 @@ COPY apps/server/package.json apps/server/
 COPY apps/web/package.json apps/web/
 RUN npm ci
 COPY . .
+# Optional PostHog key, baked into the web bundle at build time (it's a public key)
+ARG VITE_POSTHOG_KEY
+ARG VITE_POSTHOG_HOST
 RUN npm run build
 
 FROM node:20-alpine
