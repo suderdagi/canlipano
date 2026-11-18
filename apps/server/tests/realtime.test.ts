@@ -1,6 +1,6 @@
 import { createServer, type Server as HttpServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Server } from 'socket.io'
 import { io as connect, type Socket } from 'socket.io-client'
 import request from 'supertest'
@@ -14,6 +14,7 @@ import {
   type ServerToClientEvents,
 } from '@canlipano/shared'
 import { createApp } from '../src/app'
+import * as boards from '../src/boards'
 import { prisma } from '../src/db'
 import { registerSocketHandlers, type IO } from '../src/socket'
 
@@ -162,5 +163,77 @@ describe('moving cards', () => {
   it('validates input', async () => {
     const { client, todo } = await boardWithCards([])
     await expect(emit(client, 'card:create', { columnId: todo.id, title: '   ' })).rejects.toThrow('Title is required')
+  })
+})
+
+describe('columns', () => {
+  it('gives columns created at the same moment different positions', async () => {
+    const id = await newBoard()
+    const { client } = await joinAs('Sude', id)
+
+    await Promise.all(Array.from({ length: 6 }, (_, i) => emit(client, 'column:create', { title: `Column ${i}` })))
+
+    const columns = await prisma.column.findMany({ where: { boardId: id } })
+    expect(columns).toHaveLength(9) // 3 default + 6 new
+    expect(new Set(columns.map((c) => c.position)).size).toBe(9)
+  })
+})
+
+describe('malformed and failing requests', () => {
+  afterEach(() => vi.restoreAllMocks())
+
+  it('survives join requests that have no acknowledgement callback', async () => {
+    const id = await newBoard()
+    const client: Client = connect(url, { transports: ['websocket'], forceNew: true })
+    clients.push(client)
+
+    // Calling a missing callback used to throw inside the handler and stop the whole server
+    const raw = client as unknown as { emit: (event: string, payload: unknown) => void }
+    raw.emit('board:join', {})
+    raw.emit('board:join', { boardId: id, participant: person('Sude') })
+    await new Promise((r) => setTimeout(r, 150))
+
+    const { snapshot } = await joinAs('Ali', id)
+    expect(snapshot.board.id).toBe(id)
+  })
+
+  it('answers with an error, not a crash, when the database fails during join', async () => {
+    const id = await newBoard()
+    vi.spyOn(boards, 'getSnapshot').mockRejectedValueOnce(new Error('connection lost'))
+
+    await expect(joinAs('Sude', id)).rejects.toThrow('Something went wrong')
+    expect((await joinAs('Sude', id)).snapshot.board.id).toBe(id) // the next attempt works
+  })
+
+  it('rate limits join requests like every other event', async () => {
+    const id = await newBoard()
+    const client: Client = connect(url, { transports: ['websocket'], forceNew: true })
+    clients.push(client)
+
+    const results = await Promise.all(
+      Array.from(
+        { length: 100 },
+        () =>
+          new Promise<Ack<BoardSnapshot>>((resolve) =>
+            client.emit('board:join', { boardId: id, participant: person('Sude') }, resolve)
+          )
+      )
+    )
+
+    const accepted = results.filter((r) => r.ok).length
+    expect(accepted).toBeGreaterThan(0)
+    expect(accepted).toBeLessThanOrEqual(40) // burst of 30 plus a little refill
+    expect(results.find((r) => !r.ok)).toMatchObject({ error: 'Too many changes, slow down' })
+  })
+
+  it('tells the old board when a connection moves to another board', async () => {
+    const [boardA, boardB] = [await newBoard(), await newBoard()]
+    const sude = await joinAs('Sude', boardA)
+    const ali = await joinAs('Ali', boardA)
+
+    const update = nextEvent<Participant[]>(ali.client, 'presence:update')
+    await emit(sude.client, 'board:join', { boardId: boardB, participant: person('Sude') })
+
+    expect((await update).map((p) => p.name)).toEqual(['Ali'])
   })
 })

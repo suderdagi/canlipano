@@ -55,25 +55,38 @@ export function registerSocketHandlers(io: IO) {
     }
 
     socket.on('board:join', async (raw, ack) => {
+      // A client can omit the acknowledgement callback; calling it would throw inside an async
+      // handler, and an unhandled rejection stops the whole server. Same guard as in on().
+      const reply = typeof ack === 'function' ? ack : () => {}
+
+      if (!allow()) return reply({ ok: false, error: 'Too many changes, slow down' })
+
       const parsed = schemas.join.safeParse(raw)
-      if (!parsed.success) return ack({ ok: false, error: 'Invalid join request' })
+      if (!parsed.success) return reply({ ok: false, error: 'Invalid join request' })
       const { boardId, participant } = parsed.data
 
-      const snapshot = await boards.getSnapshot(boardId)
-      if (!snapshot) return ack({ ok: false, error: 'Board not found' })
+      try {
+        const snapshot = await boards.getSnapshot(boardId)
+        if (!snapshot) return reply({ ok: false, error: 'Board not found' })
 
-      // A socket can only be in one board at a time
-      if (socket.data.boardId) {
-        socket.leave(room(socket.data.boardId))
-        presence.leave(socket.data.boardId, socket.id)
+        // A socket can only be in one board at a time
+        const previous = socket.data.boardId
+        if (previous) {
+          socket.leave(room(previous))
+          presence.leave(previous, socket.id)
+          if (previous !== boardId) io.to(room(previous)).emit('presence:update', presence.list(previous))
+        }
+
+        socket.data = { boardId, participant }
+        socket.join(room(boardId))
+        presence.join(boardId, socket.id, participant)
+
+        reply({ ok: true, data: { ...snapshot, participants: presence.list(boardId) } })
+        socket.to(room(boardId)).emit('presence:update', presence.list(boardId))
+      } catch (error) {
+        logger.error({ err: error, event: 'board:join' }, 'socket handler failed')
+        reply({ ok: false, error: 'Something went wrong' })
       }
-
-      socket.data = { boardId, participant }
-      socket.join(room(boardId))
-      presence.join(boardId, socket.id, participant)
-
-      ack({ ok: true, data: { ...snapshot, participants: presence.list(boardId) } })
-      socket.to(room(boardId)).emit('presence:update', presence.list(boardId))
     })
 
     // Every change is sent back to the sender in the ack, and broadcast to everyone else in the room

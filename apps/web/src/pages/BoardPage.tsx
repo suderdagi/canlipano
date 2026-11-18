@@ -14,7 +14,7 @@ import {
 } from '@dnd-kit/core'
 import { arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable'
 import { Check, Link2, Plus } from 'lucide-react'
-import type { Card, Participant } from '@canlipano/shared'
+import { compareByPosition, type Card, type Participant } from '@canlipano/shared'
 import { loadIdentity, saveIdentity } from '../lib/identity'
 import { rememberBoard } from '../lib/recentBoards'
 import { identify, isFirstCollaboration, track } from '../lib/analytics'
@@ -73,7 +73,7 @@ function Board({ boardId, me }: { boardId: string; me: Participant }) {
   }, [error]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const columns = useMemo(
-    () => [...(state?.columns ?? [])].sort((a, b) => (a.position < b.position ? -1 : 1)),
+    () => [...(state?.columns ?? [])].sort(compareByPosition),
     [state?.columns]
   )
 

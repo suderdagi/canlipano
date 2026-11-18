@@ -26,7 +26,11 @@ export async function createBoard(name: string) {
 export async function getSnapshot(id: string): Promise<Omit<BoardSnapshot, 'participants'> | null> {
   const board = await prisma.board.findUnique({
     where: { id },
-    include: { columns: { orderBy: { position: 'asc' } }, cards: { orderBy: { position: 'asc' } } },
+    // id as a tie-breaker, the same rule as compareByPosition on the client
+    include: {
+      columns: { orderBy: [{ position: 'asc' }, { id: 'asc' }] },
+      cards: { orderBy: [{ position: 'asc' }, { id: 'asc' }] },
+    },
   })
   if (!board) return null
 
@@ -119,11 +123,20 @@ export async function deleteCard(boardId: string, id: string) {
 }
 
 export async function createColumn(boardId: string, title: string) {
-  const last = await prisma.column.findFirst({ where: { boardId }, orderBy: { position: 'desc' } })
-  const column = await prisma.column.create({
-    data: { boardId, title, position: keyBetween(last?.position ?? null, null) },
+  return prisma.$transaction(async (tx) => {
+    // Same idea as lockColumn: two people adding a column at the same moment must not read the
+    // same "last" column. The board row is locked with FOR NO KEY UPDATE, which does not block
+    // the foreign key checks of cards being created in the meantime.
+    const rows = await tx.$queryRaw<{ id: string }[]>`
+      SELECT id FROM "Board" WHERE id = ${boardId} FOR NO KEY UPDATE`
+    if (rows.length === 0) throw new UserError('Board not found')
+
+    const last = await tx.column.findFirst({ where: { boardId }, orderBy: { position: 'desc' } })
+    const column = await tx.column.create({
+      data: { boardId, title, position: keyBetween(last?.position ?? null, null) },
+    })
+    return toColumn(column)
   })
-  return toColumn(column)
 }
 
 export async function renameColumn(boardId: string, id: string, title: string) {

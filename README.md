@@ -51,7 +51,7 @@ Appending to the end is the most common move, so it has its own path that increm
 
 ### Concurrent moves
 
-The client only says *where* a card should go ("before card X" or "at the end"); the server computes the key inside a transaction that locks the target column (`SELECT … FOR UPDATE`). Two people dropping cards into the same spot at the same moment are processed one after the other and never get the same position. A test fires six simultaneous moves into one column and checks all positions are unique.
+The client only says *where* a card should go ("before card X" or "at the end"); the server computes the key inside a transaction that locks the target column (`SELECT … FOR UPDATE`). Two people dropping cards into the same spot at the same moment are processed one after the other and never get the same position. A test fires six simultaneous moves into one column and checks all positions are unique. Adding a column locks the board row for the same reason, and has its own test.
 
 ### One protocol for both sides
 
@@ -59,7 +59,8 @@ The client only says *where* a card should go ("before card X" or "at the end");
 
 ### Small but real details
 
-- Changes are rate limited per connection with a token bucket (30 burst, 10/second)
+- Every request, including joining a board, is rate limited per connection with a token bucket (30 burst, 10/second)
+- Malformed requests and database errors are answered with an error instead of stopping the server (tested)
 - Boards from different links are isolated: card ids from another board are rejected
 - Presence handles the same person in several tabs
 - In production one Node process serves the API, WebSockets and the built React app
@@ -119,7 +120,7 @@ npm test
 ```
 
 - **Shared:** ordering keys, including 300 random drag-and-drop moves
-- **Server:** real Socket.IO clients against a real database: live sync between clients, presence, board isolation, reordering, concurrent moves, validation
+- **Server:** real Socket.IO clients against a real database: live sync between clients, presence, board isolation, reordering, concurrent moves and columns, validation, malformed requests and database failures
 - **Web:** the optimistic state updates, and that analytics never sends board ids or card content
 
 ## Deploying
